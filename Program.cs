@@ -1,25 +1,40 @@
-﻿using System;
+﻿using CommandLine;
+using System;
 using System.IO;
 using System.IO.Ports;
+using System.Reflection;
 
 namespace SimpleSerialLogger
 {
+    class Options
+    {
+        [Option('p', "port", Required = false, HelpText = "Serial port name (e.g. COM3).")]
+        public string Port { get; set; }
+
+        [Option('b', "baud", Required = false, HelpText = "Baud rate (e.g. 9600, 19200).")]
+        public int? BaudRate { get; set; }
+    }
     class SerialPortReader
     {
-        static void PrintHelp()
-        {
-            Console.WriteLine("Usage:");
-            Console.WriteLine("  SerialPortReader.exe [-p PORT] [-b BAUD]");
-            Console.WriteLine();
-            Console.WriteLine("Options:");
-            Console.WriteLine("  -p        Serial port name (e.g., COM3)");
-            Console.WriteLine("  -b        Baud rate (e.g., 9600, 19200)");
-            Console.WriteLine("  -h, -help, /help   Show this help message");
-        }
         static void Main(string[] args)
         {
-            Console.WriteLine("Enter the serial port number (e.g. COM2):");
-            string portName = Console.ReadLine();
+            // Print version info
+            Console.WriteLine($"SimpleSerialLogger v{Assembly.GetExecutingAssembly().GetName().Version}\n");
+
+            Parser.Default.ParseArguments<Options>(args)
+                .WithParsed(RunWithOptions)
+                .WithNotParsed(errors => Environment.Exit(1));
+        }
+        static void RunWithOptions(Options opts)
+        {
+            string portName = opts.Port;
+            int baudRate = opts.BaudRate ?? 0;
+
+            if (string.IsNullOrEmpty(portName))
+            {
+                Console.WriteLine("Enter the serial port number (e.g. COM2):");
+                portName = Console.ReadLine();
+            }
 
             if (string.IsNullOrEmpty(portName))
             {
@@ -27,11 +42,14 @@ namespace SimpleSerialLogger
                 return;
             }
 
-            Console.WriteLine("Enter the baud rate (e.g., 9600, 19200):");
-            if (!int.TryParse(Console.ReadLine(), out int baudRate) || baudRate <= 0)
+            if (baudRate <= 0)
             {
-                Console.WriteLine("Invalid baud rate. Exiting...");
-                return;
+                Console.WriteLine("Enter the baud rate (e.g., 9600, 19200):");
+                if (!int.TryParse(Console.ReadLine(), out baudRate) || baudRate <= 0)
+                {
+                    Console.WriteLine("Invalid baud rate. Exiting...");
+                    return;
+                }
             }
 
             SerialPort serialPort = new SerialPort
@@ -42,8 +60,8 @@ namespace SimpleSerialLogger
                 DataBits = 8,
                 StopBits = StopBits.One,
                 Handshake = Handshake.None,
-                ReadTimeout = 500, // Adjust as needed
-                WriteTimeout = 500  // Adjust as needed
+                ReadTimeout = 500,
+                WriteTimeout = 500
             };
 
             string fileName = $"serialdata_{DateTime.Now:yyMMddHHmmss}.txt";
@@ -60,9 +78,9 @@ namespace SimpleSerialLogger
                         File.AppendAllText(fileName, timestampedData + Environment.NewLine);
                         Console.WriteLine($"Received: {timestampedData}");
                     }
-                    catch (TimeoutException)
+                    catch (TimeoutException) 
                     {
-                        // Handle timeout exception if needed
+                        Console.WriteLine($"Error: serial port timeout");
                     }
                     catch (Exception ex)
                     {
@@ -77,9 +95,7 @@ namespace SimpleSerialLogger
                 {
                     string userInput = Console.ReadLine();
                     if (userInput.Equals("q", StringComparison.OrdinalIgnoreCase))
-                    {
                         break;
-                    }
                 }
             }
             catch (Exception ex)
@@ -89,12 +105,9 @@ namespace SimpleSerialLogger
             finally
             {
                 if (serialPort.IsOpen)
-                {
                     serialPort.Close();
-                }
                 Console.WriteLine("Serial port closed. Exiting...");
             }
-            Console.ReadLine(); //Keep the program open if it throws an error
         }
     }
 
