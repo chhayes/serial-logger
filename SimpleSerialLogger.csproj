@@ -59,5 +59,7 @@
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 	<PropertyGroup>
 		<Version>1.0.1</Version>
+		<PublishSingleFile>true</PublishSingleFile>
+		<LangVersion>8</LangVersion>
 	</PropertyGroup>
 </Project>

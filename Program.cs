@@ -6,6 +6,12 @@ using System.Reflection;
 
 namespace SimpleSerialLogger
 {
+    public enum FileModeOption
+    {
+        One,
+        Hourly,
+        Daily
+    }
     class Options
     {
         [Option('p', "port", Required = false, HelpText = "Serial port name (e.g. COM3).")]
@@ -13,6 +19,11 @@ namespace SimpleSerialLogger
 
         [Option('b', "baud", Required = false, HelpText = "Baud rate (e.g. 9600, 19200).")]
         public int? BaudRate { get; set; }
+        [Option("prefix", Required = false, HelpText = "String to append to data file names.")]
+        public string Prefix { get; set; }
+
+        [Option('m', "mode", Required = false, Default = FileModeOption.One, HelpText = "File mode: One(def), Hourly, or Daily.")]
+        public FileModeOption Mode { get; set; }
     }
     class SerialPortReader
     {
@@ -29,6 +40,8 @@ namespace SimpleSerialLogger
         {
             string portName = opts.Port;
             int baudRate = opts.BaudRate ?? 0;
+            string prefix = opts.Prefix ?? "serialData";
+            FileModeOption mode = opts.Mode;
 
             if (string.IsNullOrEmpty(portName))
             {
@@ -64,6 +77,18 @@ namespace SimpleSerialLogger
                 WriteTimeout = 500
             };
 
+            var startTime = DateTime.Now;
+
+            string GetFilename()
+            {
+                var filenameTime = mode switch
+                {
+                    FileModeOption.Hourly => TruncateToHour(DateTime.Now) == TruncateToHour(startTime) ? startTime : TruncateToHour(DateTime.Now),
+                    FileModeOption.Daily => TruncateToDay(DateTime.Now) == TruncateToDay(startTime) ? startTime : TruncateToDay(DateTime.Now),
+                    _ => startTime
+                };
+                return $"{prefix}_{filenameTime:yyMMHHmmss}.txt";
+            }
             string fileName = $"serialdata_{DateTime.Now:yyMMddHHmmss}.txt";
             Console.WriteLine($"Data will be saved to: {fileName}");
 
@@ -75,6 +100,11 @@ namespace SimpleSerialLogger
                     {
                         string data = serialPort.ReadLine();
                         string timestampedData = $"{DateTime.Now:yy-MM-dd HH:mm:ss},{data}";
+                        if(fileName != GetFilename())
+                        {
+                            fileName = GetFilename();
+                            Console.WriteLine($"Starting new file: {fileName}");
+                        }
                         File.AppendAllText(fileName, timestampedData + Environment.NewLine);
                         Console.WriteLine($"Received: {timestampedData}");
                     }
@@ -109,6 +139,16 @@ namespace SimpleSerialLogger
                 Console.WriteLine("Serial port closed. Exiting...");
             }
         }
+        static DateTime TruncateToHour(DateTime dt)
+        {
+            return new DateTime(dt.Year, dt.Month, dt.Day, dt.Hour, 0, 0);
+        }
+        static DateTime TruncateToDay(DateTime dt)
+        {
+            return new DateTime(dt.Year, dt.Month, dt.Day, 0, 0, 0);
+        }
+
+
     }
 
 }
