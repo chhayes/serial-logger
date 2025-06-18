@@ -87,10 +87,9 @@ namespace SimpleSerialLogger
                     FileModeOption.Daily => TruncateToDay(DateTime.Now) == TruncateToDay(startTime) ? startTime : TruncateToDay(DateTime.Now),
                     _ => startTime
                 };
-                return $"{prefix}_{filenameTime:yyMMHHmmss}.txt";
+                return $"{prefix}_{filenameTime:yyMMddHHmmss}.txt";
             }
-            string fileName = $"serialdata_{DateTime.Now:yyMMddHHmmss}.txt";
-            Console.WriteLine($"Data will be saved to: {fileName}");
+            string fileName = "";
 
             try
             {
