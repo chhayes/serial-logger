@@ -12,6 +12,12 @@ namespace SimpleSerialLogger
         Hourly,
         Daily
     }
+
+    public enum ReadModeOption
+    {
+        Line,
+        Buffer
+    }
     class Options
     {
         [Option('p', "port", Required = false, HelpText = "Serial port name (e.g. COM3).")]
@@ -27,6 +33,9 @@ namespace SimpleSerialLogger
 
         [Option('c', "command", Required = false, HelpText = "Serial command to send for polling/command-response mode.")]
         public string Command { get; set; }
+
+        [Option('r', "read-mode", Required = false, Default = ReadModeOption.Line, HelpText = "Read mode: Line (default, waits for newline) or Buffer (reads all available data).")]
+        public ReadModeOption ReadMode { get; set; }
     }
     class SerialPortReader
     {
@@ -46,6 +55,7 @@ namespace SimpleSerialLogger
             string prefix = opts.Prefix ?? "serialData";
             FileModeOption mode = opts.Mode;
             string command = opts.Command;
+            ReadModeOption readMode = opts.ReadMode;
 
             if (string.IsNullOrEmpty(portName))
             {
@@ -101,15 +111,18 @@ namespace SimpleSerialLogger
                 {
                     try
                     {
-                        string data = serialPort.ReadLine();
-                        string timestampedData = $"{DateTime.Now:yy-MM-dd HH:mm:ss},{data}";
-                        if(fileName != GetFilename())
+                        string data = readMode == ReadModeOption.Line ? serialPort.ReadLine() : serialPort.ReadExisting();
+                        if (!string.IsNullOrEmpty(data))
                         {
-                            fileName = GetFilename();
-                            Console.WriteLine($"Starting new file: {fileName}");
+                            string timestampedData = $"{DateTime.Now:yy-MM-dd HH:mm:ss},{data}";
+                            if(fileName != GetFilename())
+                            {
+                                fileName = GetFilename();
+                                Console.WriteLine($"Starting new file: {fileName}");
+                            }
+                            File.AppendAllText(fileName, timestampedData + Environment.NewLine);
+                            Console.WriteLine($"Received: {timestampedData}");
                         }
-                        File.AppendAllText(fileName, timestampedData + Environment.NewLine);
-                        Console.WriteLine($"Received: {timestampedData}");
                     }
                     catch (TimeoutException) 
                     {
@@ -125,13 +138,17 @@ namespace SimpleSerialLogger
                 
                 if (!string.IsNullOrEmpty(command))
                 {
-                    Console.WriteLine($"Polling mode enabled. Command: '{command}'. Press 'q' and Enter to quit.");
+                    Console.WriteLine($"Polling mode enabled. Command: '{command}', Read mode: {readMode}. Press 'q' and Enter to quit.");
                     
                     while (true)
                     {
                         try
                         {
                             serialPort.WriteLine(command);
+                            if (readMode == ReadModeOption.Buffer)
+                            {
+                                System.Threading.Thread.Sleep(100);
+                            }
                             System.Threading.Thread.Sleep(1000);
                         }
                         catch (Exception ex)
