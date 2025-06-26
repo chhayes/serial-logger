@@ -24,6 +24,9 @@ namespace SimpleSerialLogger
 
         [Option('m', "mode", Required = false, Default = FileModeOption.One, HelpText = "File mode: One(def), Hourly, or Daily.")]
         public FileModeOption Mode { get; set; }
+
+        [Option('c', "command", Required = false, HelpText = "Serial command to send for polling/command-response mode.")]
+        public string Command { get; set; }
     }
     class SerialPortReader
     {
@@ -42,6 +45,7 @@ namespace SimpleSerialLogger
             int baudRate = opts.BaudRate ?? 0;
             string prefix = opts.Prefix ?? "serialData";
             FileModeOption mode = opts.Mode;
+            string command = opts.Command;
 
             if (string.IsNullOrEmpty(portName))
             {
@@ -118,13 +122,41 @@ namespace SimpleSerialLogger
                 };
 
                 serialPort.Open();
-                Console.WriteLine("Listening to the serial port. Press 'q' and Enter to quit.");
-
-                while (true)
+                
+                if (!string.IsNullOrEmpty(command))
                 {
-                    string userInput = Console.ReadLine();
-                    if (userInput.Equals("q", StringComparison.OrdinalIgnoreCase))
-                        break;
+                    Console.WriteLine($"Polling mode enabled. Command: '{command}'. Press 'q' and Enter to quit.");
+                    
+                    while (true)
+                    {
+                        try
+                        {
+                            serialPort.WriteLine(command);
+                            System.Threading.Thread.Sleep(1000);
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"Error sending command: {ex.Message}");
+                        }
+                        
+                        if (Console.KeyAvailable)
+                        {
+                            string userInput = Console.ReadLine();
+                            if (userInput.Equals("q", StringComparison.OrdinalIgnoreCase))
+                                break;
+                        }
+                    }
+                }
+                else
+                {
+                    Console.WriteLine("Listening to the serial port. Press 'q' and Enter to quit.");
+
+                    while (true)
+                    {
+                        string userInput = Console.ReadLine();
+                        if (userInput.Equals("q", StringComparison.OrdinalIgnoreCase))
+                            break;
+                    }
                 }
             }
             catch (Exception ex)
