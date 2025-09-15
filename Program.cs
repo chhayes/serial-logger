@@ -13,10 +13,11 @@ namespace SimpleSerialLogger
         Daily
     }
 
-    public enum ReadModeOption
+    public enum NewlineOption
     {
-        Line,
-        Buffer
+        CRLF,
+        CR,
+        LF
     }
     class Options
     {
@@ -34,8 +35,8 @@ namespace SimpleSerialLogger
         [Option('c', "command", Required = false, HelpText = "Serial command to send for polling/command-response mode.")]
         public string Command { get; set; }
 
-        [Option('r', "read-mode", Required = false, Default = ReadModeOption.Line, HelpText = "Read mode: Line (default, waits for newline) or Buffer (reads all available data).")]
-        public ReadModeOption ReadMode { get; set; }
+        [Option('n', "newline", Required = false, Default = NewlineOption.CRLF, HelpText = "Newline terminator: CRLF (default), CR, or LF.")]
+        public NewlineOption Newline { get; set; }
     }
     class SerialPortReader
     {
@@ -55,7 +56,7 @@ namespace SimpleSerialLogger
             string prefix = opts.Prefix ?? "serialData";
             FileModeOption mode = opts.Mode;
             string command = opts.Command;
-            ReadModeOption readMode = opts.ReadMode;
+            NewlineOption newlineMode = opts.Newline;
 
             if (string.IsNullOrEmpty(portName))
             {
@@ -88,7 +89,8 @@ namespace SimpleSerialLogger
                 StopBits = StopBits.One,
                 Handshake = Handshake.None,
                 ReadTimeout = 500,
-                WriteTimeout = 500
+                WriteTimeout = 500,
+                NewLine = GetNewlineString(newlineMode)
             };
 
             var startTime = DateTime.Now;
@@ -111,7 +113,7 @@ namespace SimpleSerialLogger
                 {
                     try
                     {
-                        string data = readMode == ReadModeOption.Line ? serialPort.ReadLine() : serialPort.ReadExisting();
+                        string data = serialPort.ReadLine();
                         if (!string.IsNullOrEmpty(data))
                         {
                             string timestampedData = $"{DateTime.Now:yy-MM-dd HH:mm:ss},{data}";
@@ -138,17 +140,13 @@ namespace SimpleSerialLogger
                 
                 if (!string.IsNullOrEmpty(command))
                 {
-                    Console.WriteLine($"Polling mode enabled. Command: '{command}', Read mode: {readMode}. Press 'q' and Enter to quit.");
+                    Console.WriteLine($"Polling mode enabled. Command: '{command}', Newline: {newlineMode}. Press 'q' and Enter to quit.");
                     
                     while (true)
                     {
                         try
                         {
                             serialPort.WriteLine(command);
-                            if (readMode == ReadModeOption.Buffer)
-                            {
-                                System.Threading.Thread.Sleep(100);
-                            }
                             System.Threading.Thread.Sleep(1000);
                         }
                         catch (Exception ex)
@@ -194,6 +192,17 @@ namespace SimpleSerialLogger
         static DateTime TruncateToDay(DateTime dt)
         {
             return new DateTime(dt.Year, dt.Month, dt.Day, 0, 0, 0);
+        }
+
+        static string GetNewlineString(NewlineOption newlineMode)
+        {
+            return newlineMode switch
+            {
+                NewlineOption.CR => "\r",
+                NewlineOption.LF => "\n",
+                NewlineOption.CRLF => "\r\n",
+                _ => "\r\n"
+            };
         }
 
 
